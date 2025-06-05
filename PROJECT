@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: mcp-server-operator
 repo: github.com/opendatahub-io/mcp-server-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: opendatahub.io
+  group: opendatahub.io
+  kind: MCPServer
+  path: github.com/opendatahub-io/mcp-server-operator/api/v1
+  version: v1
 version: "3"
