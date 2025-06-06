@@ -18,7 +18,7 @@ package controller
 
 import (
 	"context"
-
+	
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,9 +47,20 @@ type MCPServerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	logger := logf.FromContext(ctx)
 
-	// TODO(user): your logic here
+	MCPServer := &opendatahubiov1.MCPServer{}
+	if err := r.Get(ctx, req.NamespacedName, MCPServer); err != nil {
+		logger.Error(err, "unable to fetch MCPServer")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if MCPServer.Spec.Image != "" {
+		logger.Info("Processing MCPServer resource", "CR Name", MCPServer.Name, "CR Namespace", MCPServer.Namespace, "Image Field", MCPServer.Spec.Image)
+
+	} else {
+		logger.Info("Processing MCPServer resource, The image field is missing")
+	}
 
 	return ctrl.Result{}, nil
 }

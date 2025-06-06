@@ -20,17 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // MCPServerSpec defines the desired state of MCPServer.
 type MCPServerSpec struct {
+	// Image specifies the image of the MCP server
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of MCPServer. Edit mcpserver_types.go to remove/update
-	//Foo string `json:"foo,omitempty"`
 }
 
 // MCPServerStatus defines the observed state of MCPServer.

@@ -39,10 +39,12 @@ spec:
           spec:
             description: MCPServerSpec defines the desired state of MCPServer.
             properties:
-              foo:
-                description: Foo is an example field of MCPServer. Edit mcpserver_types.go
-                  to remove/update
+              image:
+                description: Image specifies the image of the MCP server
+                minLength: 1
                 type: string
+            required:
+            - image
             type: object
           status:
             description: MCPServerStatus defines the observed state of MCPServer.
