@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	opendatahubiov1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
+	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
 )
 
 var _ = Describe("MCPServer Controller", func() {
@@ -40,18 +40,18 @@ var _ = Describe("MCPServer Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		mcpserver := &opendatahubiov1.MCPServer{}
+		mcpserver := &mcpserverv1.MCPServer{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind MCPServer")
 			err := k8sClient.Get(ctx, typeNamespacedName, mcpserver)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &opendatahubiov1.MCPServer{
+				resource := &mcpserverv1.MCPServer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					Spec: opendatahubiov1.MCPServerSpec{
+					Spec: mcpserverv1.MCPServerSpec{
 						Image: "test-image",
 					},
 				}
@@ -61,7 +61,7 @@ var _ = Describe("MCPServer Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &opendatahubiov1.MCPServer{}
+			resource := &mcpserverv1.MCPServer{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

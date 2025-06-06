@@ -13,7 +13,7 @@ resources:
     namespaced: true
   controller: true
   domain: opendatahub.io
-  group: opendatahub.io
+  group: mcpserver
   kind: MCPServer
   path: github.com/opendatahub-io/mcp-server-operator/api/v1
   version: v1

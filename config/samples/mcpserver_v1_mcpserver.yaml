@@ -1,4 +1,4 @@
-apiVersion: opendatahub.io.opendatahub.io/v1
+apiVersion: mcpserver.opendatahub.io/v1
 kind: MCPServer
 metadata:
   labels:
@@ -6,4 +6,4 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: mcpserver-sample
 spec:
-  image: ""
+  # TODO(user): Add fields here

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	opendatahubiov1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
+	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
 )
 
 // MCPServerReconciler reconciles a MCPServer object
@@ -33,9 +33,9 @@ type MCPServerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=opendatahub.io.opendatahub.io,resources=mcpservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=opendatahub.io.opendatahub.io,resources=mcpservers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=opendatahub.io.opendatahub.io,resources=mcpservers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -49,14 +49,14 @@ type MCPServerReconciler struct {
 func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
 
-	MCPServer := &opendatahubiov1.MCPServer{}
-	if err := r.Get(ctx, req.NamespacedName, MCPServer); err != nil {
+	mcpServer := &mcpserverv1.MCPServer{}
+	if err := r.Get(ctx, req.NamespacedName, mcpServer); err != nil {
 		logger.Error(err, "unable to fetch MCPServer")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if MCPServer.Spec.Image != "" {
-		logger.Info("Processing MCPServer resource", "CR Name", MCPServer.Name, "CR Namespace", MCPServer.Namespace, "Image Field", MCPServer.Spec.Image)
+	if mcpServer.Spec.Image != "" {
+		logger.Info("Processing MCPServer resource", "CR Name", mcpServer.Name, "CR Namespace", mcpServer.Namespace, "Image Field", mcpServer.Spec.Image)
 
 	} else {
 		logger.Info("Processing MCPServer resource, The image field is missing")
@@ -68,7 +68,7 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *MCPServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&opendatahubiov1.MCPServer{}).
+		For(&mcpserverv1.MCPServer{}).
 		Named("mcpserver").
 		Complete(r)
 }
