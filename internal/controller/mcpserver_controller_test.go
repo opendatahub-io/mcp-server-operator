@@ -51,7 +51,9 @@ var _ = Describe("MCPServer Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: opendatahubiov1.MCPServerSpec{
+						Image: "test-image",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
