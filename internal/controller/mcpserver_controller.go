@@ -37,6 +37,10 @@ type MCPServerReconciler struct {
 // +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups="",resources=services,verbs=create
+// +kubebuilder:rbac:groups="apps",resources=deployments,verbs=create
+// +kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=create
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -50,16 +54,16 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	logger := logf.FromContext(ctx)
 
 	mcpServer := &mcpserverv1.MCPServer{}
-	if err := r.Get(ctx, req.NamespacedName, mcpServer); err != nil {
+	ref := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
+	err := r.Client.Get(ctx, ref, mcpServer)
+	if err != nil {
 		logger.Error(err, "unable to fetch MCPServer")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 
-	if mcpServer.Spec.Image != "" {
-		logger.Info("Processing MCPServer resource", "CR Name", mcpServer.Name, "CR Namespace", mcpServer.Namespace, "Image Field", mcpServer.Spec.Image)
-
-	} else {
-		logger.Info("Processing MCPServer resource, The image field is missing")
+	err = r.reconcileMCPServerDeployment(ctx, r.Client, mcpServer)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
