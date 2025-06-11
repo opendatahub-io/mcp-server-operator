@@ -2,11 +2,11 @@ package controller
 
 import (
 	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
@@ -20,7 +20,7 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 		mcpServerAppLabelKey: cr.Name,
 	}
 
-	dep := &appsv1.Deployment{
+	service := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
 			Kind:       "Deployment",
@@ -62,7 +62,50 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 			},
 		},
 	}
-	err := cli.Create(ctx, dep)
+	err := cli.Create(ctx, service)
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (r *MCPServerReconciler) reconcileMCPServerService(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) error {
+
+	labels := map[string]string{
+		mcpServerAppLabelKey: cr.Name,
+	}
+
+	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: cr.APIVersion,
+					Kind:       cr.Kind,
+					Name:       cr.Name,
+					UID:        cr.UID,
+				},
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: labels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "http",
+					Port:       8000,
+					TargetPort: intstr.FromString("http"),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		},
+	}
+	err := cli.Create(ctx, service)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}

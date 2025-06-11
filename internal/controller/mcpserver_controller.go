@@ -51,17 +51,31 @@ type MCPServerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Create logger with passed in context value
 	logger := logf.FromContext(ctx)
 
+	// Creates an empty MCP server with no values inside.
 	mcpServer := &mcpserverv1.MCPServer{}
+
+	// creates a key used to identify the MCPServer with the name and namespace being used.
 	ref := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
+	// Gets the MCPServer instance using the context and previous key made to then fill up the mcpServer object
 	err := r.Client.Get(ctx, ref, mcpServer)
+
+	// If the error is not nil (or empty) then it returns an error and exits the function.
 	if err != nil {
 		logger.Error(err, "unable to fetch MCPServer")
 		return ctrl.Result{}, err
 	}
 
+	// Calls the reconcileMCPServerDeployment function, passing through the context, client and the mcpServer object
 	err = r.reconcileMCPServerDeployment(ctx, r.Client, mcpServer)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Calls the reconcileMCPServerService function, passes through context, client and mcpserver object
+	err = r.reconcileMCPServerService(ctx, r.Client, mcpServer)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
