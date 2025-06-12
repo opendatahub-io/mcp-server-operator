@@ -71,12 +71,20 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Calls the reconcileMCPServerDeployment function, passing through the context, client and the mcpServer object
 	err = r.reconcileMCPServerDeployment(ctx, r.Client, mcpServer)
 	if err != nil {
+		logger.Error(err, "Failed to reconcile MCPServer Deployment")
 		return ctrl.Result{}, err
 	}
 
 	// Calls the reconcileMCPServerService function, passes through context, client and mcpserver object
 	err = r.reconcileMCPServerService(ctx, r.Client, mcpServer)
 	if err != nil {
+		logger.Error(err, "Failed to reconcile MCPServer Service")
+		return ctrl.Result{}, err
+	}
+
+	err = r.reconcileMCPServerRoute(ctx, r.Client, mcpServer)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile MCPServer Route")
 		return ctrl.Result{}, err
 	}
 

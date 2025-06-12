@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -106,6 +107,48 @@ func (r *MCPServerReconciler) reconcileMCPServerService(ctx context.Context, cli
 		},
 	}
 	err := cli.Create(ctx, service)
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func (r *MCPServerReconciler) reconcileMCPServerRoute(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) error {
+
+	labels := map[string]string{
+		mcpServerAppLabelKey: cr.Name,
+	}
+
+	route := &routev1.Route{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "route.openshift.io/v1",
+			Kind:       "Route",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: cr.APIVersion,
+					Kind:       cr.Kind,
+					Name:       cr.Name,
+					UID:        cr.UID,
+				},
+			},
+		},
+		Spec: routev1.RouteSpec{
+			Path: "/sse",
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: cr.Name,
+			},
+			Port: &routev1.RoutePort{
+				TargetPort: intstr.FromString("8000"),
+			},
+		},
+	}
+	err := cli.Create(ctx, route)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
