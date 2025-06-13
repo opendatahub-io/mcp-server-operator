@@ -10,12 +10,24 @@ rules:
   - services
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - apps
   resources:
   - deployments
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - mcpserver.opendatahub.io
   resources:
@@ -48,3 +60,9 @@ rules:
   - routes
   verbs:
   - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

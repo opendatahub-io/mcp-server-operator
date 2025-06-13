@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,19 +38,12 @@ type MCPServerReconciler struct {
 // +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups="",resources=services,verbs=create
-// +kubebuilder:rbac:groups="apps",resources=deployments,verbs=create
-// +kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=create
+// +kubebuilder:rbac:groups="",resources=services,verbs=create;get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups="apps",resources=deployments,verbs=create;get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=create;get;list;watch;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the MCPServer object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Create logger with passed in context value
 	logger := logf.FromContext(ctx)
@@ -64,6 +58,10 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// If the error is not nil (or empty) then it returns an error and exits the function.
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Resource no longer exists – nothing to do.
+			return ctrl.Result{}, nil
+		}
 		logger.Error(err, "unable to fetch MCPServer")
 		return ctrl.Result{}, err
 	}

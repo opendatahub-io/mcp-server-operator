@@ -2,18 +2,20 @@ package controller
 
 import (
 	"context"
+
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
 )
 
-const mcpServerAppLabelKey = "mcp-server"
+const mcpServerAppLabelKey = "opendatahub.io/mcp-server"
 
 func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) error {
 
@@ -21,7 +23,7 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 		mcpServerAppLabelKey: cr.Name,
 	}
 
-	service := &appsv1.Deployment{
+	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
 			Kind:       "Deployment",
@@ -30,17 +32,8 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 			Name:      cr.Name,
 			Namespace: cr.Namespace,
 			Labels:    labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: cr.APIVersion,
-					Kind:       cr.Kind,
-					Name:       cr.Name,
-					UID:        cr.UID,
-				},
-			},
 		},
 		Spec: appsv1.DeploymentSpec{
-
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -63,7 +56,14 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 			},
 		},
 	}
-	err := cli.Create(ctx, service)
+
+	// Set the MCPServer to own the deployment.
+	err := ctrl.SetControllerReference(cr, deployment, r.Scheme)
+	if err != nil {
+		return err
+	}
+
+	err = cli.Create(ctx, deployment)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
@@ -85,14 +85,6 @@ func (r *MCPServerReconciler) reconcileMCPServerService(ctx context.Context, cli
 			Name:      cr.Name,
 			Namespace: cr.Namespace,
 			Labels:    labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: cr.APIVersion,
-					Kind:       cr.Kind,
-					Name:       cr.Name,
-					UID:        cr.UID,
-				},
-			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: labels,
@@ -106,7 +98,14 @@ func (r *MCPServerReconciler) reconcileMCPServerService(ctx context.Context, cli
 			},
 		},
 	}
-	err := cli.Create(ctx, service)
+
+	// Set MCPServer to own the service.
+	err := ctrl.SetControllerReference(cr, service, r.Scheme)
+	if err != nil {
+		return err
+	}
+
+	err = cli.Create(ctx, service)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
@@ -128,14 +127,6 @@ func (r *MCPServerReconciler) reconcileMCPServerRoute(ctx context.Context, cli c
 			Name:      cr.Name,
 			Namespace: cr.Namespace,
 			Labels:    labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: cr.APIVersion,
-					Kind:       cr.Kind,
-					Name:       cr.Name,
-					UID:        cr.UID,
-				},
-			},
 		},
 		Spec: routev1.RouteSpec{
 			Path: "/sse",
@@ -144,11 +135,18 @@ func (r *MCPServerReconciler) reconcileMCPServerRoute(ctx context.Context, cli c
 				Name: cr.Name,
 			},
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromString("8000"),
+				TargetPort: intstr.FromString("http"),
 			},
 		},
 	}
-	err := cli.Create(ctx, route)
+
+	// Set MCPServer to own the route.
+	err := ctrl.SetControllerReference(cr, route, r.Scheme)
+	if err != nil {
+		return err
+	}
+
+	err = cli.Create(ctx, route)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}

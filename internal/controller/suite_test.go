@@ -22,17 +22,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
+	routev1 "github.com/openshift/api/route/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,22 +58,34 @@ func TestControllers(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+var testScheme = runtime.NewScheme()
+
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	var err error
-	err = mcpserverv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
-		ErrorIfCRDPathMissing: true,
+		CRDInstallOptions: envtest.CRDInstallOptions{
+			Scheme: testScheme,
+			Paths: []string{
+				filepath.Join("..", "..", "config", "crd", "bases"),
+				filepath.Join("..", "..", "config", "crd", "external"),
+			},
+			ErrorIfPathMissing: true,
+			CleanUpAfterUse:    false,
+		},
 	}
+
+	utilruntime.Must(rbacv1.AddToScheme(testScheme))
+	utilruntime.Must(corev1.AddToScheme(testScheme))
+	utilruntime.Must(appsv1.AddToScheme(testScheme))
+	utilruntime.Must(routev1.AddToScheme(testScheme))
+	utilruntime.Must(mcpserverv1.AddToScheme(testScheme))
+	// +kubebuilder:scaffold:scheme
 
 	// Retrieve the first found binary directory to allow running tests from IDEs
 	if getFirstFoundEnvTestBinaryDir() != "" {
@@ -80,7 +97,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 })
