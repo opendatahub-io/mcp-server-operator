@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,29 +38,52 @@ type MCPServerReconciler struct {
 // +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=mcpserver.opendatahub.io,resources=mcpservers/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups="",resources=services,verbs=create;get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups="apps",resources=deployments,verbs=create;get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=create;get;list;watch;update;patch;delete
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the MCPServer object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Create logger with passed in context value
 	logger := logf.FromContext(ctx)
 
+	// Creates an empty MCP server with no values inside.
 	mcpServer := &mcpserverv1.MCPServer{}
-	if err := r.Get(ctx, req.NamespacedName, mcpServer); err != nil {
+
+	// creates a key used to identify the MCPServer with the name and namespace being used.
+	ref := client.ObjectKey{Name: req.Name, Namespace: req.Namespace}
+	// Gets the MCPServer instance using the context and previous key made to then fill up the mcpServer object
+	err := r.Client.Get(ctx, ref, mcpServer)
+
+	// If the error is not nil (or empty) then it returns an error and exits the function.
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Resource no longer exists – nothing to do.
+			return ctrl.Result{}, nil
+		}
 		logger.Error(err, "unable to fetch MCPServer")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
 	}
 
-	if mcpServer.Spec.Image != "" {
-		logger.Info("Processing MCPServer resource", "CR Name", mcpServer.Name, "CR Namespace", mcpServer.Namespace, "Image Field", mcpServer.Spec.Image)
+	// Calls the reconcileMCPServerDeployment function, passing through the context, client and the mcpServer object
+	err = r.reconcileMCPServerDeployment(ctx, r.Client, mcpServer)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile MCPServer Deployment")
+		return ctrl.Result{}, err
+	}
 
-	} else {
-		logger.Info("Processing MCPServer resource, The image field is missing")
+	// Calls the reconcileMCPServerService function, passes through context, client and mcpserver object
+	err = r.reconcileMCPServerService(ctx, r.Client, mcpServer)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile MCPServer Service")
+		return ctrl.Result{}, err
+	}
+
+	err = r.reconcileMCPServerRoute(ctx, r.Client, mcpServer)
+	if err != nil {
+		logger.Error(err, "Failed to reconcile MCPServer Route")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

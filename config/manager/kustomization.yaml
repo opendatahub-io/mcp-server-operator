@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/rh-ee-cmclaugh/mcp-server-operator
-  newTag: rhoaieng-24213
+  newTag: rhoaieng-24254-2
