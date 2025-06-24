@@ -105,8 +105,6 @@ spec:
                   - type
                   type: object
                 type: array
-            required:
-            - conditions
             type: object
         type: object
     served: true

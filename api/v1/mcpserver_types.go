@@ -30,7 +30,8 @@ type MCPServerSpec struct {
 
 // MCPServerStatus defines the observed state of MCPServer.
 type MCPServerStatus struct {
-	Conditions []metav1.Condition `json:"conditions"`
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -40,7 +41,6 @@ type MCPServerStatus struct {
 // +kubebuilder:subresource:status
 
 // MCPServer is the Schema for the mcpservers API.
-// +kubebuilder:subresource:status
 type MCPServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

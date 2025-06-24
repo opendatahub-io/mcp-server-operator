@@ -186,9 +186,9 @@ func (r *MCPServerReconciler) getDeploymentCondition(ctx context.Context, cli cl
 
 	// Converts the deployment's status conditions into a metav1 condition.
 	// This is for future use in the isStatusConditionTrue call.
-	var metaConditions = make([]metav1.Condition, 0)
+	var deploymentConditions = make([]metav1.Condition, 0)
 	for _, cond := range dep.Status.Conditions {
-		metaConditions = append(metaConditions, metav1.Condition{
+		deploymentConditions = append(deploymentConditions, metav1.Condition{
 			Type:    string(cond.Type),
 			Status:  metav1.ConditionStatus(cond.Status),
 			Reason:  cond.Reason,
@@ -196,7 +196,7 @@ func (r *MCPServerReconciler) getDeploymentCondition(ctx context.Context, cli cl
 		})
 	}
 
-	if !meta.IsStatusConditionTrue(metaConditions, "Available") {
+	if !meta.IsStatusConditionTrue(deploymentConditions, "Available") {
 		return metav1.Condition{
 			Type:    DeploymentAvailable,
 			Status:  metav1.ConditionFalse,
@@ -291,7 +291,7 @@ func (r *MCPServerReconciler) getRouteCondition(ctx context.Context, cli client.
 		Type:    RouteAvailable,
 		Status:  metav1.ConditionTrue,
 		Reason:  "RouteAdmitted",
-		Message: "Route is admitted and active",
+		Message: fmt.Sprintf("Route %s is admitted and active", cr.Name),
 	}
 
 }
@@ -304,7 +304,7 @@ func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) met
 
 	if depCondition == nil || depCondition.Status != metav1.ConditionTrue {
 		return metav1.Condition{
-			Type:    DeploymentAvailable,
+			Type:    OverallAvailable,
 			Status:  metav1.ConditionFalse,
 			Reason:  "DeploymentNotReady",
 			Message: "Deployment is not yet ready",
@@ -312,7 +312,7 @@ func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) met
 	}
 	if svcCondition == nil || svcCondition.Status != metav1.ConditionTrue {
 		return metav1.Condition{
-			Type:    ServiceAvailable,
+			Type:    OverallAvailable,
 			Status:  metav1.ConditionFalse,
 			Reason:  "ServiceNotReady",
 			Message: "Service is not yet ready",
@@ -320,7 +320,7 @@ func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) met
 	}
 	if routeCondition == nil || routeCondition.Status != metav1.ConditionTrue {
 		return metav1.Condition{
-			Type:    RouteAvailable,
+			Type:    OverallAvailable,
 			Status:  metav1.ConditionFalse,
 			Reason:  "RouteNotReady",
 			Message: "Route is not yet ready",
