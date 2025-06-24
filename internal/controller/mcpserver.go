@@ -2,6 +2,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,7 +18,14 @@ import (
 	mcpserverv1 "github.com/opendatahub-io/mcp-server-operator/api/v1"
 )
 
-const mcpServerAppLabelKey = "opendatahub.io/mcp-server"
+const (
+	mcpServerAppLabelKey = "opendatahub.io/mcp-server"
+
+	DeploymentAvailable = "DeploymentAvailable"
+	RouteAvailable      = "RouteAvailable"
+	ServiceAvailable    = "ServiceAvailable"
+	OverallAvailable    = "Available"
+)
 
 func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) error {
 
@@ -151,4 +161,177 @@ func (r *MCPServerReconciler) reconcileMCPServerRoute(ctx context.Context, cli c
 		return err
 	}
 	return nil
+}
+
+func (r *MCPServerReconciler) getDeploymentCondition(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) metav1.Condition {
+	dep := &appsv1.Deployment{}
+
+	err := cli.Get(ctx, client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, dep)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return metav1.Condition{
+				Type:    DeploymentAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "DeploymentNotFound",
+				Message: fmt.Sprintf("Deployment %s cannot be found", cr.Name),
+			}
+		}
+		return metav1.Condition{
+			Type:    DeploymentAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "DeploymentGetFailed",
+			Message: fmt.Sprintf("Failed to retrieve Deployment %s, %v", cr.Name, err),
+		}
+	}
+
+	// Converts the deployment's status conditions into a metav1 condition.
+	// This is for future use in the isStatusConditionTrue call.
+	var metaConditions = make([]metav1.Condition, 0)
+	for _, cond := range dep.Status.Conditions {
+		metaConditions = append(metaConditions, metav1.Condition{
+			Type:    string(cond.Type),
+			Status:  metav1.ConditionStatus(cond.Status),
+			Reason:  cond.Reason,
+			Message: cond.Message,
+		})
+	}
+
+	if !meta.IsStatusConditionTrue(metaConditions, "Available") {
+		return metav1.Condition{
+			Type:    DeploymentAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  "DeploymentNotReady",
+			Message: fmt.Sprintf("Deployment %s is not yet available", cr.Name),
+		}
+	}
+
+	return metav1.Condition{
+		Type:    DeploymentAvailable,
+		Status:  metav1.ConditionTrue,
+		Reason:  "DeploymentReady",
+		Message: fmt.Sprintf("Deployment %s is available", cr.Name),
+	}
+
+}
+
+func (r *MCPServerReconciler) getServiceCondition(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) metav1.Condition {
+
+	svc := &corev1.Service{}
+	err := cli.Get(ctx, client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, svc)
+
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return metav1.Condition{
+				Type:    ServiceAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ServiceNotFound",
+				Message: fmt.Sprintf("Service %s not found", cr.Name),
+			}
+		}
+		return metav1.Condition{
+			Type:    ServiceAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "ServiceGetFailed",
+			Message: fmt.Sprintf("Failed to get Service %s: %v", cr.Name, err),
+		}
+	}
+
+	return metav1.Condition{
+		Type:    ServiceAvailable,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ServiceExists",
+		Message: fmt.Sprintf("Service %s exists and is available", cr.Name),
+	}
+}
+
+func (r *MCPServerReconciler) getRouteCondition(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) metav1.Condition {
+	route := &routev1.Route{}
+	err := cli.Get(ctx, client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, route)
+
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return metav1.Condition{
+				Type:    RouteAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  "RouteNotFound",
+				Message: fmt.Sprintf("Route %s not found", cr.Name),
+			}
+		}
+		return metav1.Condition{
+			Type:    RouteAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  "RouteGetFailed",
+			Message: fmt.Sprintf("Failed to get Route %s: %v", cr.Name, err),
+		}
+	}
+
+	admitted := false
+	for _, ingress := range route.Status.Ingress {
+		for _, cond := range ingress.Conditions {
+			if cond.Type == routev1.RouteAdmitted && cond.Status == corev1.ConditionTrue {
+				admitted = true
+				break
+			}
+		}
+		if admitted {
+			break
+		}
+	}
+
+	if !admitted {
+		return metav1.Condition{
+			Type:    RouteAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  "RouteNotAdmitted",
+			Message: fmt.Sprintf("Route %s has not been admitted by a router yet", cr.Name),
+		}
+	}
+
+	return metav1.Condition{
+		Type:    RouteAvailable,
+		Status:  metav1.ConditionTrue,
+		Reason:  "RouteAdmitted",
+		Message: "Route is admitted and active",
+	}
+
+}
+
+func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) metav1.Condition {
+
+	depCondition := meta.FindStatusCondition(cr.Status.Conditions, DeploymentAvailable)
+	svcCondition := meta.FindStatusCondition(cr.Status.Conditions, ServiceAvailable)
+	routeCondition := meta.FindStatusCondition(cr.Status.Conditions, RouteAvailable)
+
+	if depCondition == nil || depCondition.Status != metav1.ConditionTrue {
+		return metav1.Condition{
+			Type:    DeploymentAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  "DeploymentNotReady",
+			Message: "Deployment is not yet ready",
+		}
+	}
+	if svcCondition == nil || svcCondition.Status != metav1.ConditionTrue {
+		return metav1.Condition{
+			Type:    ServiceAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  "ServiceNotReady",
+			Message: "Service is not yet ready",
+		}
+	}
+	if routeCondition == nil || routeCondition.Status != metav1.ConditionTrue {
+		return metav1.Condition{
+			Type:    RouteAvailable,
+			Status:  metav1.ConditionFalse,
+			Reason:  "RouteNotReady",
+			Message: "Route is not yet ready",
+		}
+	}
+
+	return metav1.Condition{
+		Type:    OverallAvailable,
+		Status:  metav1.ConditionTrue,
+		Reason:  "AllComponentsReady",
+		Message: "All managed components (Deployment, Service, Route) are ready",
+	}
+
 }
