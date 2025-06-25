@@ -18,8 +18,12 @@ package controller
 
 import (
 	"context"
+	"reflect"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,7 +68,10 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		logger.Error(err, "unable to fetch MCPServer")
 		return ctrl.Result{}, err
+
 	}
+
+	originalStatus := mcpServer.Status.DeepCopy()
 
 	// Calls the reconcileMCPServerDeployment function, passing through the context, client and the mcpServer object
 	err = r.reconcileMCPServerDeployment(ctx, r.Client, mcpServer)
@@ -86,6 +93,28 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
+	meta.SetStatusCondition(&mcpServer.Status.Conditions, r.getDeploymentCondition(ctx, r.Client, mcpServer))
+	meta.SetStatusCondition(&mcpServer.Status.Conditions, r.getServiceCondition(ctx, r.Client, mcpServer))
+	meta.SetStatusCondition(&mcpServer.Status.Conditions, r.getRouteCondition(ctx, r.Client, mcpServer))
+
+	overallReady := r.getOverallCondition(mcpServer)
+	meta.SetStatusCondition(&mcpServer.Status.Conditions, overallReady)
+
+	if !reflect.DeepEqual(originalStatus, &mcpServer.Status) {
+		logger.Info("Status has changed, attempting to update")
+		if err = r.Status().Update(ctx, mcpServer); err != nil {
+			logger.Error(err, "unable to update MCPServer status")
+			return ctrl.Result{}, err
+		}
+		logger.Info("Successfully updated MCPServer status")
+	}
+
+	if overallReady.Status != metav1.ConditionTrue {
+		logger.Info("MCPServer not yet fully ready, re-queuing...", "reason", overallReady.Reason, "message", overallReady.Message)
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	}
+
+	logger.Info("MCPServer is fully ready", "name", mcpServer.Name, "namespace", mcpServer.Namespace)
 	return ctrl.Result{}, nil
 }
 

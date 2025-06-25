@@ -30,6 +30,9 @@ type MCPServerSpec struct {
 
 // MCPServerStatus defines the observed state of MCPServer.
 type MCPServerStatus struct {
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
