@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -70,12 +71,7 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	}
 
-	defer func() {
-		logger.V(1).Info("Attempting to update MCPServer status with conditions", "conditions", mcpServer.Status.Conditions)
-		if err = r.Status().Update(ctx, mcpServer); err != nil {
-			logger.Error(err, "unable to update status")
-		}
-	}()
+	originalStatus := mcpServer.Status.DeepCopy()
 
 	// Calls the reconcileMCPServerDeployment function, passing through the context, client and the mcpServer object
 	err = r.reconcileMCPServerDeployment(ctx, r.Client, mcpServer)
@@ -103,6 +99,15 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	overallReady := r.getOverallCondition(mcpServer)
 	meta.SetStatusCondition(&mcpServer.Status.Conditions, overallReady)
+
+	if !reflect.DeepEqual(originalStatus, &mcpServer.Status) {
+		logger.Info("Status has changed, attempting to update")
+		if err = r.Status().Update(ctx, mcpServer); err != nil {
+			logger.Error(err, "unable to update MCPServer status")
+			return ctrl.Result{}, err
+		}
+		logger.Info("Successfully updated MCPServer status")
+	}
 
 	if overallReady.Status != metav1.ConditionTrue {
 		logger.Info("MCPServer not yet fully ready, re-queuing...", "reason", overallReady.Reason, "message", overallReady.Message)
