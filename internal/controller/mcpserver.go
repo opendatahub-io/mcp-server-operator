@@ -21,10 +21,18 @@ import (
 const (
 	mcpServerAppLabelKey = "opendatahub.io/mcp-server"
 
+	// Condition types
 	DeploymentAvailable = "DeploymentAvailable"
 	RouteAvailable      = "RouteAvailable"
 	ServiceAvailable    = "ServiceAvailable"
 	OverallAvailable    = "Available"
+
+	// Reason types
+	ReasonNotFoundSuffix   = "NotFound"
+	ReasonReadySuffix      = "Ready"
+	ReasonNotReadySuffix   = "NotReady"
+	ReasonGetFailedSuffix  = "GetFailed"
+	ReasonRouteNotAdmitted = "RouteNotAdmitted"
 )
 
 func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) error {
@@ -172,14 +180,14 @@ func (r *MCPServerReconciler) getDeploymentCondition(ctx context.Context, cli cl
 			return metav1.Condition{
 				Type:    DeploymentAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "DeploymentNotFound",
+				Reason:  fmt.Sprintf("%s%s", "Deployment", ReasonNotFoundSuffix),
 				Message: fmt.Sprintf("Deployment %s cannot be found", cr.Name),
 			}
 		}
 		return metav1.Condition{
 			Type:    DeploymentAvailable,
 			Status:  metav1.ConditionUnknown,
-			Reason:  "DeploymentGetFailed",
+			Reason:  fmt.Sprintf("%s%s", "Deployment", ReasonGetFailedSuffix),
 			Message: fmt.Sprintf("Failed to retrieve Deployment %s, %v", cr.Name, err),
 		}
 	}
@@ -196,11 +204,11 @@ func (r *MCPServerReconciler) getDeploymentCondition(ctx context.Context, cli cl
 		})
 	}
 
-	if !meta.IsStatusConditionTrue(deploymentConditions, "Available") {
+	if !meta.IsStatusConditionTrue(deploymentConditions, string(appsv1.DeploymentAvailable)) {
 		return metav1.Condition{
 			Type:    DeploymentAvailable,
 			Status:  metav1.ConditionFalse,
-			Reason:  "DeploymentNotReady",
+			Reason:  fmt.Sprintf("%s%s", "Deployment", ReasonNotReadySuffix),
 			Message: fmt.Sprintf("Deployment %s is not yet available", cr.Name),
 		}
 	}
@@ -208,7 +216,7 @@ func (r *MCPServerReconciler) getDeploymentCondition(ctx context.Context, cli cl
 	return metav1.Condition{
 		Type:    DeploymentAvailable,
 		Status:  metav1.ConditionTrue,
-		Reason:  "DeploymentReady",
+		Reason:  fmt.Sprintf("%s%s", "Deployment", ReasonReadySuffix),
 		Message: fmt.Sprintf("Deployment %s is available", cr.Name),
 	}
 
@@ -224,14 +232,14 @@ func (r *MCPServerReconciler) getServiceCondition(ctx context.Context, cli clien
 			return metav1.Condition{
 				Type:    ServiceAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ServiceNotFound",
+				Reason:  fmt.Sprintf("%s%s", "Service", ReasonNotFoundSuffix),
 				Message: fmt.Sprintf("Service %s not found", cr.Name),
 			}
 		}
 		return metav1.Condition{
 			Type:    ServiceAvailable,
 			Status:  metav1.ConditionUnknown,
-			Reason:  "ServiceGetFailed",
+			Reason:  fmt.Sprintf("%s%s", "Service", ReasonGetFailedSuffix),
 			Message: fmt.Sprintf("Failed to get Service %s: %v", cr.Name, err),
 		}
 	}
@@ -239,7 +247,7 @@ func (r *MCPServerReconciler) getServiceCondition(ctx context.Context, cli clien
 	return metav1.Condition{
 		Type:    ServiceAvailable,
 		Status:  metav1.ConditionTrue,
-		Reason:  "ServiceExists",
+		Reason:  fmt.Sprintf("%s%s", "Service", ReasonReadySuffix),
 		Message: fmt.Sprintf("Service %s exists and is available", cr.Name),
 	}
 }
@@ -253,14 +261,14 @@ func (r *MCPServerReconciler) getRouteCondition(ctx context.Context, cli client.
 			return metav1.Condition{
 				Type:    RouteAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "RouteNotFound",
+				Reason:  fmt.Sprintf("%s%s", "Route", ReasonNotFoundSuffix),
 				Message: fmt.Sprintf("Route %s not found", cr.Name),
 			}
 		}
 		return metav1.Condition{
 			Type:    RouteAvailable,
 			Status:  metav1.ConditionUnknown,
-			Reason:  "RouteGetFailed",
+			Reason:  fmt.Sprintf("%s%s", "Route", ReasonGetFailedSuffix),
 			Message: fmt.Sprintf("Failed to get Route %s: %v", cr.Name, err),
 		}
 	}
@@ -282,7 +290,7 @@ func (r *MCPServerReconciler) getRouteCondition(ctx context.Context, cli client.
 		return metav1.Condition{
 			Type:    RouteAvailable,
 			Status:  metav1.ConditionFalse,
-			Reason:  "RouteNotAdmitted",
+			Reason:  ReasonRouteNotAdmitted,
 			Message: fmt.Sprintf("Route %s has not been admitted by a router yet", cr.Name),
 		}
 	}
@@ -290,7 +298,7 @@ func (r *MCPServerReconciler) getRouteCondition(ctx context.Context, cli client.
 	return metav1.Condition{
 		Type:    RouteAvailable,
 		Status:  metav1.ConditionTrue,
-		Reason:  "RouteAdmitted",
+		Reason:  fmt.Sprintf("%s%s", "Route", ReasonReadySuffix),
 		Message: fmt.Sprintf("Route %s is admitted and active", cr.Name),
 	}
 
@@ -306,7 +314,7 @@ func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) met
 		return metav1.Condition{
 			Type:    OverallAvailable,
 			Status:  metav1.ConditionFalse,
-			Reason:  "DeploymentNotReady",
+			Reason:  fmt.Sprintf("%s%s", "Deployment", ReasonNotReadySuffix),
 			Message: "Deployment is not yet ready",
 		}
 	}
@@ -314,7 +322,7 @@ func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) met
 		return metav1.Condition{
 			Type:    OverallAvailable,
 			Status:  metav1.ConditionFalse,
-			Reason:  "ServiceNotReady",
+			Reason:  fmt.Sprintf("%s%s", "Service", ReasonNotReadySuffix),
 			Message: "Service is not yet ready",
 		}
 	}
@@ -322,7 +330,7 @@ func (r *MCPServerReconciler) getOverallCondition(cr *mcpserverv1.MCPServer) met
 		return metav1.Condition{
 			Type:    OverallAvailable,
 			Status:  metav1.ConditionFalse,
-			Reason:  "RouteNotReady",
+			Reason:  fmt.Sprintf("%s%s", "Route", ReasonNotReadySuffix),
 			Message: "Route is not yet ready",
 		}
 	}
