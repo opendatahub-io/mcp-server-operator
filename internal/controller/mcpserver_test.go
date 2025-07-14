@@ -316,7 +316,7 @@ func TestMCPServerReconciler_getDeploymentCondition(t *testing.T) {
 		Status: appsv1.DeploymentStatus{
 			Conditions: []appsv1.DeploymentCondition{
 				{
-					Type:   DeploymentAvailable,
+					Type:   appsv1.DeploymentAvailable,
 					Status: corev1.ConditionTrue,
 					Reason: fmt.Sprintf("%s%s", "Deployment", ReasonReadySuffix),
 				},
@@ -333,7 +333,7 @@ func TestMCPServerReconciler_getDeploymentCondition(t *testing.T) {
 		Status: appsv1.DeploymentStatus{
 			Conditions: []appsv1.DeploymentCondition{
 				{
-					Type:   DeploymentAvailable,
+					Type:   appsv1.DeploymentAvailable,
 					Status: corev1.ConditionFalse,
 					Reason: fmt.Sprintf("%s%s", "Deployment", ReasonNotReadySuffix),
 				},
