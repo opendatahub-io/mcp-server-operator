@@ -894,7 +894,7 @@ func TestMCPServerReconciler_getOverallCondition(t *testing.T) {
 			want: metav1.Condition{
 				Type:    OverallAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "DeploymentNotReady",
+				Reason:  fmt.Sprintf("%s%s", "Deployment", ReasonNotReadySuffix),
 				Message: "Deployment is not yet ready",
 			},
 		},
@@ -1017,7 +1017,7 @@ func TestMCPServerReconciler_getOverallCondition(t *testing.T) {
 			want: metav1.Condition{
 				Type:    OverallAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "ServiceNotReady",
+				Reason:  fmt.Sprintf("%s%s", "Service", ReasonNotReadySuffix),
 				Message: "Service is not yet ready",
 			},
 		},
@@ -1047,7 +1047,7 @@ func TestMCPServerReconciler_getOverallCondition(t *testing.T) {
 			want: metav1.Condition{
 				Type:    OverallAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  "RouteNotReady",
+				Reason:  fmt.Sprintf("%s%s", "Route", ReasonNotReadySuffix),
 				Message: "Route is not yet ready",
 			},
 		},
