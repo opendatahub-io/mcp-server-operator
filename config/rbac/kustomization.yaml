@@ -25,4 +25,7 @@ resources:
 - mcpserver_admin_role.yaml
 - mcpserver_editor_role.yaml
 - mcpserver_viewer_role.yaml
-
+  # The following RBAC configurations are required because the MCP server uses
+  # the default service account when communicating with the cluster.
+- mcp_server_get_role.yaml
+- mcp_server_get_role_binding.yaml
