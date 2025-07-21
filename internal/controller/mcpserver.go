@@ -147,7 +147,6 @@ func (r *MCPServerReconciler) reconcileMCPServerRoute(ctx context.Context, cli c
 			Labels:    labels,
 		},
 		Spec: routev1.RouteSpec{
-			Path: "/sse",
 			To: routev1.RouteTargetReference{
 				Kind: "Service",
 				Name: cr.Name,
