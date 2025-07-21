@@ -68,7 +68,7 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 							Name:          "http",
 						}},
 						Command: []string{"./kubernetes-mcp-server"},
-						Args:    []string{"--sse-port", "8000"},
+						Args:    []string{"--port", "8000", "--log-level", "9"},
 					}},
 				},
 			},
@@ -147,7 +147,6 @@ func (r *MCPServerReconciler) reconcileMCPServerRoute(ctx context.Context, cli c
 			Labels:    labels,
 		},
 		Spec: routev1.RouteSpec{
-			Path: "/sse",
 			To: routev1.RouteTargetReference{
 				Kind: "Service",
 				Name: cr.Name,

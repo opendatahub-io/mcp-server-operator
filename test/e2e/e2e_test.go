@@ -181,25 +181,19 @@ spec:
 			}).Should(Succeed(), "MCPServer CR status did not become True")
 
 			By("querying the route URL and verifying that the output is as expected")
-			var routeHost, routePath string
+			var routeHost string
 			Eventually(func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "route", crName, "-n", namespace, "-o", "jsonpath={.spec.host} {.spec.path}")
+				cmd := exec.Command("kubectl", "get", "route", crName, "-n", namespace, "-o", "jsonpath={.spec.host}")
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).NotTo(BeEmpty(), "Route host and path should not be empty")
+				g.Expect(output).NotTo(BeEmpty(), "Route host should not be empty")
 
-				// The output will be in the format "host /path", so we split it by the space.
-				parts := strings.Split(strings.TrimSpace(output), " ")
-				g.Expect(parts).To(HaveLen(2), "Expected output to contain both a host and a path")
-
-				routeHost = parts[0]
-				routePath = parts[1]
+				routeHost = strings.TrimSpace(output)
 				g.Expect(routeHost).NotTo(BeEmpty())
-				g.Expect(routePath).NotTo(BeEmpty())
-			}).Should(Succeed(), "Should be able to get the route hostname and path")
+			}).Should(Succeed(), "Should be able to get the route hostname")
 
 			// Create the route URL using the host and the sse path
-			routeURL := fmt.Sprintf("http://%s%s", routeHost, routePath)
+			routeURL := fmt.Sprintf("http://%s/sse", routeHost)
 			_, _ = fmt.Fprintf(GinkgoWriter, "Querying route URL: %s\n", routeURL)
 
 			Eventually(func(g Gomega) {
