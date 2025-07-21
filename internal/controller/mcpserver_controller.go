@@ -21,6 +21,15 @@ import (
 	"reflect"
 	"time"
 
+	routev1 "github.com/openshift/api/route/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,8 +129,61 @@ func (r *MCPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MCPServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Create a predicate to filter resources with the "opendatahub.io/mcp-server" label
+	labelPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return e.Object.GetLabels()["opendatahub.io/mcp-server"] != ""
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return e.ObjectNew.GetLabels()["opendatahub.io/mcp-server"] != ""
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return e.Object.GetLabels()["opendatahub.io/mcp-server"] != ""
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return e.Object.GetLabels()["opendatahub.io/mcp-server"] != ""
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mcpserverv1.MCPServer{}).
+		Watches(&appsv1.Deployment{},
+			handler.EnqueueRequestsFromMapFunc(r.mapResourceToMCPServer),
+			builder.WithPredicates(labelPredicate)).
+		Watches(&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(r.mapResourceToMCPServer),
+			builder.WithPredicates(labelPredicate)).
+		Watches(&routev1.Route{},
+			handler.EnqueueRequestsFromMapFunc(r.mapResourceToMCPServer),
+			builder.WithPredicates(labelPredicate)).
 		Named("mcpserver").
 		Complete(r)
+}
+
+// mapResourceToMCPServer maps a watched resource to the MCPServer that owns it
+func (r *MCPServerReconciler) mapResourceToMCPServer(ctx context.Context, obj client.Object) []reconcile.Request {
+	// Get the owner references to find the MCPServer that owns this resource
+	for _, ownerRef := range obj.GetOwnerReferences() {
+		if ownerRef.Kind == "MCPServer" && ownerRef.APIVersion == mcpserverv1.GroupVersion.String() {
+			return []reconcile.Request{
+				{
+					NamespacedName: client.ObjectKey{
+						Name:      ownerRef.Name,
+						Namespace: obj.GetNamespace(),
+					},
+				},
+			}
+		}
+	}
+
+	// If no MCPServer owner found, try to find by matching names/labels
+	// This is a fallback mechanism
+	return []reconcile.Request{
+		{
+			NamespacedName: client.ObjectKey{
+				Name:      obj.GetName(),
+				Namespace: obj.GetNamespace(),
+			},
+		},
+	}
 }
