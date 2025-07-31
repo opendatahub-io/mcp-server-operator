@@ -23,6 +23,11 @@ const (
 	mcpServerImage = "test-image"
 )
 
+var (
+	CustomMCPDeploymentCommand = []string{"/bin/sh"}
+	CustomMCPDeploymentArgs    = []string{"-c", "echo 'custom'"}
+)
+
 func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 	// Create an existing deployment
 	existingDeployment := &appsv1.Deployment{
@@ -30,14 +35,22 @@ func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 			Name:      mcpServerName,
 			Namespace: testNamespace,
 		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "mcp-server"}},
+				},
+			},
+		},
 	}
+
 	objects := []runtime.Object{existingDeployment}
 
 	// Create a fake scheme
 	fakeScheme := runtime.NewScheme()
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 
 	// Create context
@@ -52,6 +65,17 @@ func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 			Image: mcpServerImage,
 		},
 	}
+	mcpServerWithCustoms := &mcpserverv1.MCPServer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mcpServerName,
+			Namespace: testNamespace,
+		},
+		Spec: mcpserverv1.MCPServerSpec{
+			Image:   mcpServerImage,
+			Command: CustomMCPDeploymentCommand,
+			Args:    CustomMCPDeploymentArgs,
+		},
+	}
 
 	type fields struct {
 		Client client.Client
@@ -63,13 +87,15 @@ func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 		cr  *mcpserverv1.MCPServer
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
+		name        string
+		fields      fields
+		args        args
+		wantErr     bool
+		wantCommand []string
+		wantArgs    []string
 	}{
 		{
-			name: "Verify MCPServer Deployment can be created",
+			name: "Verify MCPServer Deployment can be created with default values",
 			fields: fields{
 				Client: fake.NewClientBuilder().Build(),
 				Scheme: fakeScheme,
@@ -79,7 +105,9 @@ func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 				cli: fake.NewClientBuilder().Build(),
 				cr:  mcpServer,
 			},
-			wantErr: false,
+			wantErr:     false,
+			wantCommand: DefaultMCPDeploymentCommand,
+			wantArgs:    DefaultMCPDeploymentArgs,
 		},
 		{
 			name: "Verify if deployment exists the function does not return an error",
@@ -94,6 +122,21 @@ func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "Verify Deployment is created with custom command and args",
+			fields: fields{
+				Client: fake.NewClientBuilder().Build(),
+				Scheme: fakeScheme,
+			},
+			args: args{
+				ctx: testContext,
+				cli: fake.NewClientBuilder().Build(),
+				cr:  mcpServerWithCustoms,
+			},
+			wantErr:     false,
+			wantCommand: CustomMCPDeploymentCommand, // Expect the custom value
+			wantArgs:    CustomMCPDeploymentArgs,    // Expect the custom value
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,8 +144,31 @@ func TestMCPServerReconciler_reconcileMCPServerDeployment(t *testing.T) {
 				Client: tt.fields.Client,
 				Scheme: tt.fields.Scheme,
 			}
-			if err := r.reconcileMCPServerDeployment(tt.args.ctx, tt.args.cli, tt.args.cr); (err != nil) != tt.wantErr {
+
+			err := r.reconcileMCPServerDeployment(context.Background(), tt.fields.Client, tt.args.cr)
+
+			if (err != nil) != tt.wantErr {
 				t.Errorf("reconcileMCPServerDeployment() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+
+			// Fetch the reconciled deployment to verify its state
+			foundDeployment := &appsv1.Deployment{}
+			err = tt.fields.Client.Get(context.Background(), types.NamespacedName{Name: tt.args.cr.Name, Namespace: tt.args.cr.Namespace}, foundDeployment)
+			if err != nil {
+				t.Errorf("failed to get deployment for verification: %v", err)
+			}
+
+			// Verify the container's command and args
+			container := foundDeployment.Spec.Template.Spec.Containers[0]
+			if !reflect.DeepEqual(container.Command, tt.wantCommand) {
+				t.Errorf("Command mismatch: got %v, want %v", container.Command, tt.wantCommand)
+			}
+			if !reflect.DeepEqual(container.Args, tt.wantArgs) {
+				t.Errorf("Args mismatch: got %v, want %v", container.Args, tt.wantArgs)
 			}
 		})
 	}
@@ -122,7 +188,7 @@ func TestMCPServerReconciler_reconcileMCPServerService(t *testing.T) {
 	fakeScheme := runtime.NewScheme()
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 
 	// Create context
@@ -209,11 +275,11 @@ func TestMCPServerReconciler_reconcileMCPServerRoute(t *testing.T) {
 
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 	err = routev1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add routev1 scheme: %v", err)
+		t.Errorf("failed to add routev1 scheme: %v", err)
 	}
 
 	// Create context
@@ -345,7 +411,7 @@ func TestMCPServerReconciler_getDeploymentCondition(t *testing.T) {
 	fakeScheme := runtime.NewScheme()
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 
 	// Create context
@@ -502,7 +568,7 @@ func TestMCPServerReconciler_getServiceCondition(t *testing.T) {
 	fakeScheme := runtime.NewScheme()
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 
 	// Create context
@@ -663,11 +729,11 @@ func TestMCPServerReconciler_getRouteCondition(t *testing.T) {
 	fakeScheme := runtime.NewScheme()
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 	err = routev1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add routev1 scheme: %v", err)
+		t.Errorf("failed to add routev1 scheme: %v", err)
 	}
 
 	// Create context
@@ -820,7 +886,7 @@ func TestMCPServerReconciler_getOverallCondition(t *testing.T) {
 	fakeScheme := runtime.NewScheme()
 	err := mcpserverv1.AddToScheme(fakeScheme)
 	if err != nil {
-		t.Fatalf("failed to add mcpserverv1 scheme: %v", err)
+		t.Errorf("failed to add mcpserverv1 scheme: %v", err)
 	}
 
 	type fields struct {

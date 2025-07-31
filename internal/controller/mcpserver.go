@@ -35,10 +35,25 @@ const (
 	ReasonRouteNotAdmitted = "RouteNotAdmitted"
 )
 
+var (
+	DefaultMCPDeploymentCommand = []string{"./kubernetes-mcp-server"}
+	DefaultMCPDeploymentArgs    = []string{"--port", "8000", "--log-level", "9"}
+)
+
 func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, cli client.Client, cr *mcpserverv1.MCPServer) error {
 
 	labels := map[string]string{
 		mcpServerAppLabelKey: cr.Name,
+	}
+
+	command := DefaultMCPDeploymentCommand
+	if cr.Spec.Command != nil {
+		command = cr.Spec.Command
+	}
+
+	args := DefaultMCPDeploymentArgs
+	if cr.Spec.Args != nil {
+		args = cr.Spec.Args
 	}
 
 	deployment := &appsv1.Deployment{
@@ -67,8 +82,8 @@ func (r *MCPServerReconciler) reconcileMCPServerDeployment(ctx context.Context, 
 							ContainerPort: 8000,
 							Name:          "http",
 						}},
-						Command: []string{"./kubernetes-mcp-server"},
-						Args:    []string{"--port", "8000", "--log-level", "9"},
+						Command: command,
+						Args:    args,
 					}},
 				},
 			},

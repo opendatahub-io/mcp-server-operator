@@ -39,6 +39,16 @@ spec:
           spec:
             description: MCPServerSpec defines the desired state of MCPServer.
             properties:
+              args:
+                description: Args specifies the runtime args for the MCP server
+                items:
+                  type: string
+                type: array
+              command:
+                description: Command specifies the command for the MCP server
+                items:
+                  type: string
+                type: array
               image:
                 description: Image specifies the image of the MCP server
                 minLength: 1
