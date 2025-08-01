@@ -26,6 +26,14 @@ type MCPServerSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
+
+	// Args specifies the runtime args for the MCP server
+	// +optional
+	Args []string `json:"args,omitempty"`
+
+	// Command specifies the command for the MCP server
+	// +optional
+	Command []string `json:"command,omitempty"`
 }
 
 // MCPServerStatus defines the observed state of MCPServer.
